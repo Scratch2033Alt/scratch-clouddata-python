@@ -31,6 +31,10 @@ import libsql_client
 # ----------------- Configuration & Globals -----------------
 UA_STRING = "ScratchWarpCloud/1.0 (https://github.com/Scratch2033Alt OR https://scratch.mit.edu/users/wetogeter)"
 BROWSER_KEYWORDS = ["Chrome", "Firefox", "Safari", "Edge", "Opera", "Edg/"]  # Edg/ catches Edge UA variants
+ERROR_HTML = "ERROR! CANNOT FIND ERROR.HTML! IF YOU ARE THE SITE OWNER, PLEASE ADD AN ERROR.HTML TO YOUR ROOT FOLDER OF THIS PYTHON SCRIPT."
+if os.path.isfile("error.html"):
+      with open("error.html", "r") as file:
+         ERROR_HTML = file.read()
 
 projects: Dict[str, Dict[str, str]] = {}   # project_id -> {name: value}
 logs: Dict[str, List[Dict[str, Any]]] = {}  # normal logs (validated browser clients)
@@ -67,6 +71,22 @@ MEMORY_THRESHOLD_PERCENT = 75
 # args container used in various places
 args = None
 
+# Serve error.html on plain HTTP GET /
+async def handle_root(request):
+    if request.headers.get("Upgrade", "").lower() == "websocket":
+        return await ws_handler(request)
+    else:
+        peer = request.remote or "unknown"
+        print(f"[ROOT] {request.method} / from {peer}")
+        return web.Response(status=200, text=ERROR_HTML, content_type="text/html")
+
+# Catch-all 404 → serve error.html
+async def handle_404(request):
+    # Suppress favicon logs
+    if request.path != "/favicon.ico":
+        peer = request.remote or "unknown"
+        print(f"[404] {request.method} {request.path} from {peer}")
+    return web.Response(status=404, text=ERROR_HTML, content_type="text/html")
 
 # ----------------- Utility helpers -----------------
 def memory_usage_high() -> bool:
@@ -630,6 +650,7 @@ async def ws_handler(request):
 
             # HANDSHAKE
             if method == "handshake":
+                print(f"[WS] Handshake {user} on project {project_id}")
                 # If uA is enabled and client appears browser-like, perform user checks
                 if app_args.use_authorization and browser_like:
                     # Check user existence
@@ -639,6 +660,7 @@ async def ws_handler(request):
                         await ws.send_json({"Error": "Sorry! Banned accounts cannot use the cloud.", "ScratchAuthFailed": "True"})
                         await add_log(project_id, user, "auth_fail", "handshake_user_missing", "banned", bot=True)
                         await ws.close()
+                        print(f"[WS] User is banned: {user}")
                         return ws
                     # Expect sessionid + csrftoken from client in handshake
                     sid = data.get("sessionid")
@@ -650,6 +672,7 @@ async def ws_handler(request):
                         await ws.send_json({"Error": "Sorry! Banned accounts cannot use the cloud.", "ScratchAuthFailed": "True"})
                         await add_log(project_id, user, "auth_fail", "handshake_bad_session", "bad_session", bot=True)
                         await ws.close()
+                        print(f"[WS] Could not validate session for user {user}")
                         return ws
 
                 # Register connection to room
@@ -705,7 +728,7 @@ async def ws_handler(request):
                 if not validate_value(value):
                     await ws.send_json({"Error": "Invalid value. Must be numeric and <1000 chars."})
                     continue
-
+                print(f"[WS - SET VAR] SET {name} to value {value} by user {user}")
                 # store in memory (or flush to DB if memory high)
                 if memory_usage_high():
                     await flush_memory_to_db()
@@ -826,9 +849,10 @@ async def main():
     # Build app
     app = web.Application()
     app["args"] = args
-    app.router.add_get("/", ws_handler)
+    app.router.add_get("/", handle_root)
     app.router.add_get("/logs", handle_logs)
     app.router.add_get("/bots", handle_bots)
+    app.router.add_routes([web.route("*", "/{tail:.*}", handle_404)])
 
     # Setup TLS if requested
     ssl_ctx = None
