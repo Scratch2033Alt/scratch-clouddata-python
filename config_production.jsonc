@@ -1,0 +1,69 @@
+{
+  // --- BASIC SETTINGS ---
+  
+  // Enable HTTPS/WSS mode (True = use TLS)
+  "secure_host": true,
+
+  // Set default port behavior:
+  // - If secure_host = true → use port 443
+  // - If secure_host = false → use port 80
+  "default_port": 443,
+
+  // Explicit port override (optional; takes priority over default_port)
+  // "port": 4430,
+
+
+  // --- DATABASE SETTINGS ---
+
+  // Primary libSQL database URL (local or remote)
+  "save_db": "libsql://prod-database.turso.io",
+
+  // Token for authenticating to libSQL
+  "db_token": "EXAMPLE_LIBSQL_TOKEN_HERE",
+
+  // Optional backup DB (not required)
+  // "save_db_path": "libsql://backup-db.turso.io",
+  // "save_db_token": "OPTIONAL_SECOND_TOKEN",
+
+
+  // --- FILE PERSISTENCE ---
+
+  // Local JSON file used to save state if DB is unavailable
+  "save_file": "cloud_backup.json",
+
+
+  // --- CLOUD SYNC / SCRATCH INTEGRATION ---
+
+  // Enable syncing with the official Scratch cloud server
+  "sync": true,
+
+  // Proxy connections to Scratch first, then TurboWarp if Scratch fails
+  "proxy_scratch": true,
+
+  // Scratch credentials for login/session fetching
+  "session": ["ScratchUser123", "MySecurePassword"],
+
+  // Enforce authorization: non-browser user-agents must provide valid session tokens
+  "use_authorization": true,
+
+
+  // --- WEB SERVER / FRONTEND ---
+
+  // Custom HTML file shown for / and 404 responses
+  "error_file": "error.html",
+
+  // Mimics --default-port behavior (80/443 standard web ports)
+  "default_port_flag": true,
+
+  // Optional: log verbosity level (for future use)
+  "log_level": "info",
+
+
+  // --- META / INFO ---
+
+  // Enable production mode from config
+  "production": true,
+
+  // Freeform comment field (ignored by script)
+  "notes": "Production setup for secure WSS cloud server with full Scratch sync + DB persistence"
+}

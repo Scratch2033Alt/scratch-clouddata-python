@@ -13,7 +13,7 @@ Full clouddata proxy+sync server implementing:
 - Persistent libsql-client connection with offline queue (db_offline_queue.json)
 - Bots vs browser logs (/bots vs /logs)
 """
-
+PRODUCTION = False # Set to True if on production!
 import argparse
 import asyncio
 import json
@@ -801,8 +801,27 @@ async def main():
     parser.add_argument("--session", nargs=2, metavar=("USER", "PASS"), help="Scratch username and password (required for --ps or --sync)")
     parser.add_argument("--use-authorization", "--uA", action="store_true", help="Authenticate browser-like clients on every handshake")
     parser.add_argument("--ua", help="Override UA string", default=None)
+    parser.add_argument("--port", type=int, help="Manually specify port (overrides default)")
+    parser.add_argument("--default-port", "--dp", action="store_true", help="Use standard ports (80 for HTTP / 443 for HTTPS)")
+    parser.add_argument("--production", action="store_true", help="Enable production mode (load args from production_config.json)")
+    parser.add_argument("--config-file", default="production_config.json", help="Production config file path")
 
     args = parser.parse_args()
+
+    # Determine final port
+    if PRODUCTION and hasattr(args, "port") and args.port:
+        final_port = args.port
+    elif args.port:
+        final_port = args.port
+    elif args.default_port:
+        final_port = 443 if args.secure_host else 80
+    else:
+        final_port = 4430 if args.secure_host else 8080
+
+    args.default_port = final_port
+
+    proto = "wss" if args.secure_host else "ws"
+    print(f"[CONFIG] Protocol: {proto.upper()} | Port: {args.default_port}")
 
     # UA override
     global UA_STRING
@@ -868,10 +887,10 @@ async def main():
     # Start server
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", 8765, ssl_context=ssl_ctx)
+    site = web.TCPSite(runner, "0.0.0.0", args.default_port, ssl_context=ssl_ctx)
     await site.start()
     proto = "wss" if args.secure_host else "ws"
-    print(f"[SERVER] Listening on {proto}://0.0.0.0:8765/")
+    print(f"[SERVER] Listening on {proto}://0.0.0.0:{args.default_port}/")
 
     # Graceful shutdown handling
     try:
